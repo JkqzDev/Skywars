@@ -1,0 +1,9 @@
+name: Skywars
+version: 1.0.0
+author: JuqnGOOD
+main: juqn\skywars\Skywars
+api: 4.0.0
+permissions:
+  skywars.command:
+    description: Permission for use the skywars command
+    default: op
