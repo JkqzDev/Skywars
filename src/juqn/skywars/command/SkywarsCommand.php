@@ -53,9 +53,12 @@ final class SkywarsCommand extends Command {
                     return;
                 }
                 $game = $games[0];
-                $game->addPlayer($session);
-                $session->setGame($game);
-                
+
+                if ($game->addPlayer($session)) {
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aGood luck!'));
+                } else {
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cYou can\'t join. Try again.'));
+                }
                 break;
 
             default:
