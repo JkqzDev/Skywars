@@ -36,7 +36,7 @@ final class SkywarsHandler implements Listener {
                 $creatorHandler->save();
                 break;
 
-            case 'heightLimiter':
+            case 'height_limiter':
                 $event->cancel();
 
                 $position_y = $player->getPosition()->subtract(0, 1, 0)->getFloorY();
@@ -49,7 +49,7 @@ final class SkywarsHandler implements Listener {
                 $player->sendMessage(TextFormat::colorize('&aYou have been set height limiter in y=' . $position_y));
                 break;
 
-            case 'minPlayers':
+            case 'min_players':
                 $event->cancel();
 
                 if (!isset($args[1])) {
@@ -71,7 +71,7 @@ final class SkywarsHandler implements Listener {
                 $player->sendMessage(TextFormat::colorize('&aYou have been set min players in ' . $minPlayers));
                 break;
 
-            case 'maxPlayers':
+            case 'max_players':
                 $event->cancel();
 
                 if (!isset($args[1])) {
@@ -111,7 +111,7 @@ final class SkywarsHandler implements Listener {
                     $player->sendMessage(TextFormat::colorize('&cInvalid spawn index.'));
                     return;
                 }
-                $creatorHandler->addSpawn($slotIndex - 1, $player->getPosition()->asVector3()->subtract(0, 1, 0));
+                $creatorHandler->addSpawn($slotIndex - 1, $player->getPosition()->asVector3()->subtract(0, 1, 0)->floor()->add(0.5, 0, 0.5));
                 $player->sendMessage(TextFormat::colorize('&aSpawn #' . $slotIndex . ' added.'));
                 break;
         }

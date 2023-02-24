@@ -133,7 +133,11 @@ final class Game {
             $slotIndex++;
         }
         $this->slots[$slotIndex] = $session->getPlayer()->getXuid();
-        $session->getPlayer()->teleport(Position::fromObject($this->spawns[$slotIndex]->add(0.5, 1, 0.5), $this->world));
+        $session->getPlayer()->teleport(Position::fromObject($this->spawns[$slotIndex], $this->world));
+
+        if ($this->state === self::WAITING && count($this->playerManager->getAll()) >= $this->minPlayers) {
+            $this->state = self::STARTING;
+        }
         return true;
     }
 
