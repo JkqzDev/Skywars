@@ -59,6 +59,10 @@ final class SkywarsHandler implements Listener {
         $args = explode(' ', $message);
 
         switch (strtolower($args[0])) {
+            case '?':
+            case 'help':
+                break;
+
             case 'save':
                 $event->cancel();
 
@@ -71,77 +75,77 @@ final class SkywarsHandler implements Listener {
                 $position_y = $player->getPosition()->subtract(0, 1, 0)->getFloorY();
 
                 if ($position_y <= World::Y_MIN && $position_y > World::Y_MAX) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid height limiter.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid height limiter.'));
                     return;
                 }
                 $creatorHandler->setHeightLimiter($position_y);
-                $player->sendMessage(TextFormat::colorize('&aYou have been set height limiter in y=' . $position_y));
+                $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aYou have been set height limiter in y=' . $position_y));
                 break;
 
             case 'min_players':
                 $event->cancel();
 
                 if (!isset($args[1])) {
-                    $player->sendMessage(TextFormat::colorize('&cUse minPlayers [number]'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cUse minPlayers [number]'));
                     return;
                 }
 
                 if (!is_numeric($args[1])) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid number.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid number.'));
                     return;
                 }
                 $minPlayers = (int) $args[1];
 
                 if ($minPlayers < 2 || $minPlayers >= $creatorHandler->getMaxPlayers()) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid min players.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid min players.'));
                     return;
                 }
                 $creatorHandler->setMinPlayers($minPlayers);
-                $player->sendMessage(TextFormat::colorize('&aYou have been set min players in ' . $minPlayers));
+                $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aYou have been set min players in ' . $minPlayers));
                 break;
 
             case 'max_players':
                 $event->cancel();
 
                 if (!isset($args[1])) {
-                    $player->sendMessage(TextFormat::colorize('&cUse maxPlayers [number]'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cUse maxPlayers [number]'));
                     return;
                 }
 
                 if (!is_numeric($args[1])) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid number.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid number.'));
                     return;
                 }
                 $maxPlayers = (int) $args[1];
 
                 if ($maxPlayers <= $creatorHandler->getMinPlayers() || $maxPlayers > 64) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid max players.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid max players.'));
                     return;
                 }
                 $creatorHandler->setMaxPlayers($maxPlayers);
-                $player->sendMessage(TextFormat::colorize('&aYou have been set max players in ' . $maxPlayers));
+                $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aYou have been set max players in ' . $maxPlayers));
                 break;
 
             case 'spawn':
                 $event->cancel();
 
                 if (!isset($args[1])) {
-                    $player->sendMessage(TextFormat::colorize('&cUse spawn [number]'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cUse spawn [number]'));
                     return;
                 }
 
                 if (!is_numeric($args[1])) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid number.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid number.'));
                     return;
                 }
                 $slotIndex = (int) $args[1];
 
                 if ($slotIndex <= 0 || $slotIndex > $creatorHandler->getMaxPlayers()) {
-                    $player->sendMessage(TextFormat::colorize('&cInvalid spawn index.'));
+                    $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid spawn index.'));
                     return;
                 }
                 $creatorHandler->addSpawn($slotIndex - 1, $player->getPosition()->asVector3()->subtract(0, 1, 0)->floor()->add(0.5, 0, 0.5));
-                $player->sendMessage(TextFormat::colorize('&aSpawn #' . $slotIndex . ' added.'));
+                $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aSpawn #' . $slotIndex . ' added.'));
                 break;
         }
     }

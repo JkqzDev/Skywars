@@ -114,7 +114,6 @@ final class Game {
         $this->playerManager->reset();
         $worldName = $this->world->getFolderName();
 
-        Server::getInstance()->getWorldManager()->unloadWorld($this->world);
         Server::getInstance()->getAsyncPool()->submitTask(new WorldDeleteAsync(
             worldName: $worldName,
             closure: function () use ($worldName): void {

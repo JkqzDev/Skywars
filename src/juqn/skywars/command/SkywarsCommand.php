@@ -46,18 +46,18 @@ final class SkywarsCommand extends Command {
 
             case 'create':
                 if ($session->getCreatorHandler() !== null) {
-                    $sender->sendMessage(TextFormat::colorize('&cYou have already creator.'));
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cYou have already creator.'));
                     return;
                 }
 
                 if (!isset($args[1])) {
-                    $sender->sendMessage(TextFormat::colorize('&cUse /skywars create [world]'));
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cUse /skywars create [world]'));
                     return;
                 }
                 $worldName = $args[1];
 
                 if (!$sender->getServer()->getWorldManager()->isWorldGenerated($worldName)) {
-                    $sender->sendMessage(TextFormat::colorize('&cWorld not exists.'));
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cWorld not exists.'));
                     return;
                 }
 
@@ -65,12 +65,35 @@ final class SkywarsCommand extends Command {
                     $sender->getServer()->getWorldManager()->loadWorld($worldName);
                 }
                 $session->startCreatorHandler($sender->getServer()->getWorldManager()->getWorldByName($worldName));
-                $sender->sendMessage(TextFormat::colorize('&aUse \'?\' for help'));
+                $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aUse \'?\' for help'));
+                break;
+
+            case 'remove':
+                if (!$session->getCreatorHandler() !== null) {
+                    return;
+                }
+
+                if (!isset($args[1])) {
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cUse /skywars remove [worldName]'));
+                    return;
+                }
+                $worldName = $args[1];
+
+                if (GameFactory::get($worldName) === null) {
+                    $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cGame not exists.'));
+                    return;
+                }
+                $game = GameFactory::get($worldName);
+                $game->stop();
+
+                GameFactory::delete($worldName);
+                $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aYou have been delete the ' . $worldName . ' game.'));
                 break;
 
             case 'npc':
                 $entity = new SkywarsEntity($sender->getLocation(), $sender->getSkin());
                 $entity->spawnToAll();
+                $sender->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aYou have been spawned Skywars NPC.'));
                 break;
 
             ///////////////////////////////////////////// COMMANDS FOR TEST PLUGIN /////////////////////////////////////////////
