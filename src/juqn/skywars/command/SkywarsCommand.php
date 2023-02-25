@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace juqn\skywars\command;
 
+use juqn\skywars\entity\SkywarsEntity;
 use juqn\skywars\game\Game;
 use juqn\skywars\game\GameFactory;
 use juqn\skywars\session\SessionFactory;
@@ -65,6 +66,11 @@ final class SkywarsCommand extends Command {
                 }
                 $session->startCreatorHandler($sender->getServer()->getWorldManager()->getWorldByName($worldName));
                 $sender->sendMessage(TextFormat::colorize('&aUse \'?\' for help'));
+                break;
+
+            case 'npc':
+                $entity = new SkywarsEntity($sender->getLocation(), $sender->getSkin());
+                $entity->spawnToAll();
                 break;
 
             ///////////////////////////////////////////// COMMANDS FOR TEST PLUGIN /////////////////////////////////////////////

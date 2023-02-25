@@ -208,7 +208,7 @@ final class Game {
         }
         $finalHealth = $entity->getHealth() - $event->getFinalDamage();
 
-        if ($finalHealth <= 0.000) {
+        if ($finalHealth <= 0.000 || $event->getCause() === EntityDamageEvent::CAUSE_VOID) {
             $event->cancel();
             $entity->setGamemode(GameMode::SPECTATOR());
             $player->setSpectator(true);
