@@ -103,7 +103,7 @@ final class SkywarsHandler implements Listener {
 
                 $position_y = $player->getPosition()->subtract(0, 1, 0)->getFloorY();
 
-                if ($position_y <= World::Y_MIN && $position_y > World::Y_MAX) {
+                if ($position_y <= World::Y_MIN || $position_y > World::Y_MAX) {
                     $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&cInvalid height limiter.'));
                     return;
                 }
