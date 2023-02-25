@@ -41,10 +41,15 @@ final class Session {
         $this->creatorHandler = null;
     }
 
-    public function quit(): void {
-        $this->game?->removePlayer($this);
+    public function clear(): void {
+        $player = $this->player;
 
-        $this->game = null;
-        $this->creatorHandler = null;
+        $player->getArmorInventory()->clearAll();
+        $player->getInventory()->clearAll();
+        $player->getOffHandInventory()->clearAll();
+        $player->getCraftingGrid()->clearAll();
+
+        $player->getHungerManager()->setFood($player->getHungerManager()->getMaxFood());
+        $player->setHealth($player->getMaxHealth());
     }
 }

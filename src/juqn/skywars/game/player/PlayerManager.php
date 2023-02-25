@@ -16,6 +16,9 @@ final class PlayerManager {
         private Game $game
     ) {}
 
+    /**
+     * @return Player[]
+     */
     public function getAll(): array {
         return $this->players;
     }

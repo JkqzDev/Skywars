@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace juqn\skywars\game;
 
 use InvalidArgumentException;
+use juqn\skywars\event\player\PlayerJoinGame;
+use juqn\skywars\event\player\PlayerQuitGame;
+use juqn\skywars\event\player\PlayerWinGame;
 use juqn\skywars\game\player\Player;
 use juqn\skywars\game\player\PlayerManager;
 use juqn\skywars\game\task\GameRunningTask;
@@ -108,7 +111,7 @@ final class Game {
 
         foreach ($this->playerManager->getAll() as $player) {
             if ($player->getInstance()->isOnline()) {
-                $player->getInstance()->teleport(Server::getInstance()->getWorldManager()->getDefaultWorld()->getSpawnLocation());
+                $player->getInstance()->teleport(Server::getInstance()->getWorldManager()->getDefaultWorld()?->getSpawnLocation());
             }
         }
         $this->playerManager->reset();
@@ -142,10 +145,14 @@ final class Game {
     }
 
     public function checkWinner(): void {
+        /** @var Player[] $players */
         $players = array_values(array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying() && !$player->isSpectator()));
 
         if (count($players) === 1) {
             $winner = $players[0];
+
+            $event = new PlayerWinGame($this, $winner->getInstance());
+            $event->call();
 
             $this->state = self::ENDING;
         }
@@ -180,11 +187,11 @@ final class Game {
             return;
         }
         $session = SessionFactory::get($entity);
-        $player = $this->playerManager->get($session);
 
         if ($session === null) {
             return;
         }
+        $player = $this->playerManager->get($session);
 
         if ($event instanceof EntityDamageByEntityEvent) {
             $damager = $event->getDamager();
@@ -193,28 +200,28 @@ final class Game {
                 return;
             }
             $target = SessionFactory::get($damager);
-            $target_player = $this->playerManager->get($target);
 
             if ($target === null) {
                 return;
             }
+            $target_player = $this->playerManager->get($target);
 
             if ($target->getGame() === null || $target->getGame()->getWorld()->getFolderName() !== $this->getWorld()->getFolderName()) {
                 $event->cancel();
                 return;
             }
-            $player->getCombat()->set($target_player);
+            $player?->getCombat()->set($target_player);
         }
         $finalHealth = $entity->getHealth() - $event->getFinalDamage();
 
         if ($finalHealth <= 0.000 || $event->getCause() === EntityDamageEvent::CAUSE_VOID) {
             $event->cancel();
             $entity->setGamemode(GameMode::SPECTATOR());
-            $player->setSpectator(true);
+            $player?->setSpectator(true);
 
-            if ($player->getCombat()->inCombat() && $player->getCombat()->getLastDamager() !== null) {
+            if ($player !== null && $player->getCombat()->inCombat() && $player->getCombat()->getLastDamager() !== null) {
                 $lastDamager = $player->getCombat()->getLastDamager();
-                $this->playerManager->get($lastDamager->getInstance())->addElimination();
+                $this->playerManager->get($lastDamager->getInstance())?->addElimination();
 
                 $this->broadcast(TextFormat::colorize('&e' . $entity->getName() . ' &7was killed by &e' . $lastDamager->getInstance()->getName()));
             }
@@ -237,7 +244,9 @@ final class Game {
         }
         $this->playerManager->add($session);
         $session->setGame($this);
-        $session->getPlayer()->setImmobile();
+
+        $event = new PlayerJoinGame($this, $session->getPlayer());
+        $event->call();
 
         $slotIndex = 0;
         while (isset($this->slots[$slotIndex])) {
@@ -265,6 +274,9 @@ final class Game {
         }
         $this->playerManager->remove($session);
         $session->setGame(null);
+
+        $event = new PlayerQuitGame($this, $session->getPlayer());
+        $event->call();
 
         $slotIndex = array_search($session->getPlayer()->getXuid(), $this->slots);
         if ($slotIndex !== false) {
