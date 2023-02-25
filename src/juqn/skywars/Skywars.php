@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace juqn\skywars;
 
 use juqn\skywars\command\SkywarsCommand;
+use juqn\skywars\task\GameTask;
 use pocketmine\plugin\PluginBase;
 use pocketmine\utils\SingletonTrait;
 
@@ -19,8 +20,14 @@ final class Skywars extends PluginBase {
 
     protected function onEnable(): void {
         /////////////////////////////////////////////////
+        if (!is_dir($this->getDataFolder() . 'worlds')) {
+            @mkdir($this->getDataFolder() . 'worlds');
+        }
+        /////////////////////////////////////////////////
         $this->getServer()->getCommandMap()->register('Skywars', new SkywarsCommand());
         /////////////////////////////////////////////////
         $this->getServer()->getPluginManager()->registerEvents(new SkywarsHandler(), $this);
+        ////////////////////////////////////////////////
+        $this->getScheduler()->scheduleRepeatingTask(new GameTask(), 20);
     }
 }

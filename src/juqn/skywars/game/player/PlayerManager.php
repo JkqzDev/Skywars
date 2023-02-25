@@ -18,7 +18,8 @@ final class PlayerManager {
         return $this->players;
     }
 
-    public function get(Session $session): ?Player {
+    public function get(Session|\pocketmine\player\Player $session): ?Player {
+        $xuid = $session instanceof Session ? $session->getPlayer()->getXuid() : $session->getXuid();
         return $this->players[$session->getPlayer()->getXuid()] ?? null;
     }
 

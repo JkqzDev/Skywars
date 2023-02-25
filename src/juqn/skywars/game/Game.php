@@ -7,12 +7,21 @@ namespace juqn\skywars\game;
 use InvalidArgumentException;
 use juqn\skywars\game\player\Player;
 use juqn\skywars\game\player\PlayerManager;
-use juqn\skywars\game\task\GameWaitingTask;
+use juqn\skywars\game\task\GameRunningTask;
 use juqn\skywars\session\Session;
+use juqn\skywars\session\SessionFactory;
 use juqn\skywars\Skywars;
+use juqn\skywars\task\world\WorldCopyAsync;
+use juqn\skywars\task\world\WorldDeleteAsync;
 use pocketmine\block\VanillaBlocks;
+use pocketmine\event\block\BlockBreakEvent;
+use pocketmine\event\block\BlockPlaceEvent;
+use pocketmine\event\entity\EntityDamageByEntityEvent;
+use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\math\Vector3;
-use pocketmine\scheduler\TaskHandler;
+use pocketmine\player\GameMode;
+use pocketmine\Server;
+use pocketmine\utils\TextFormat;
 use pocketmine\world\Position;
 use pocketmine\world\World;
 
@@ -33,7 +42,7 @@ final class Game {
      * @param int $state
      * @param Vector3[] $spawns
      * @param string[] $slots
-     * @param TaskHandler|null $taskHandler
+     * @param GameRunningTask|null $gameRunningTask
      */
     public function __construct(
         private World $world,
@@ -43,10 +52,10 @@ final class Game {
         private int $state = self::WAITING,
         private array $spawns = [],
         private array $slots = [],
-        private ?TaskHandler $taskHandler = null
+        private ?GameRunningTask $gameRunningTask = null
     ) {
         $this->playerManager = new PlayerManager($this);
-        $this->taskHandler = Skywars::getInstance()->getScheduler()->scheduleRepeatingTask(new GameWaitingTask($this, 60), 20);
+        $this->gameRunningTask = new GameRunningTask($this, 60, 10);
     }
 
     public function getWorld(): World {
@@ -65,17 +74,26 @@ final class Game {
         return $this->state;
     }
 
-    public function setState(int $state): void {
-        $this->state = $state;
+    public function getGameRunningTask(): ?GameRunningTask {
+        return $this->gameRunningTask;
     }
 
     public function getPlayerManager(): PlayerManager {
         return $this->playerManager;
     }
 
+    public function setState(int $state): void {
+        $this->state = $state;
+    }
+
     public function start(): void {
         $this->state = self::RUNNING;
-        $this->taskHandler?->cancel();
+
+        foreach ($this->playerManager->getAll() as $player) {
+            if ($player->getInstance()->isOnline()) {
+                $player->getInstance()->setImmobile(false);
+            }
+        }
 
         foreach ($this->spawns as $spawnIndex => $spawn) {
             if (isset($this->slots[$spawnIndex])) {
@@ -84,8 +102,30 @@ final class Game {
         }
     }
 
-    public function finish(): void {
+    public function stop(): void {
         $this->state = self::ENDING;
+        $this->slots = [];
+
+        foreach ($this->playerManager->getAll() as $player) {
+            if ($player->getInstance()->isOnline()) {
+                $player->getInstance()->teleport(Server::getInstance()->getWorldManager()->getDefaultWorld()->getSpawnLocation());
+            }
+        }
+        $this->playerManager->reset();
+        $worldName = $this->world->getFolderName();
+
+        Server::getInstance()->getWorldManager()->unloadWorld($this->world);
+        Server::getInstance()->getAsyncPool()->submitTask(new WorldDeleteAsync(
+            worldName: $worldName,
+            closure: function () use ($worldName): void {
+                Server::getInstance()->getAsyncPool()->submitTask(new WorldCopyAsync(
+                    worldName: $worldName,
+                    closure: function (World $world): void {
+                        Skywars::getInstance()->getLogger()->info('World from the game ' . $world->getFolderName() . ' is open.');
+                    }
+                ));
+            }
+        ));
     }
 
     public function broadcast(string $message, int $type = 0): void {
@@ -108,7 +148,78 @@ final class Game {
         if (count($players) === 1) {
             $winner = $players[0];
 
-            // Add win
+            $this->state = self::ENDING;
+        }
+    }
+
+    public function handleBreak(BlockBreakEvent $event): void {
+        if ($this->state <= self::STARTING) {
+            $event->cancel();
+        }
+    }
+
+    public function handlePlace(BlockPlaceEvent $event): void {
+        $block = $event->getBlock();
+
+        if ($this->state <= self::STARTING) {
+            $event->cancel();
+        } else {
+            if ($block->getPosition()->getFloorY() >= $this->heightLimiter) {
+                $event->cancel();
+            }
+        }
+    }
+
+    public function handleDamage(EntityDamageEvent $event): void {
+        if ($this->state <= Game::STARTING) {
+            $event->cancel();
+            return;
+        }
+        $entity = $event->getEntity();
+
+        if (!$entity instanceof \pocketmine\player\Player) {
+            return;
+        }
+        $session = SessionFactory::get($entity);
+        $player = $this->playerManager->get($session);
+
+        if ($session === null) {
+            return;
+        }
+
+        if ($event instanceof EntityDamageByEntityEvent) {
+            $damager = $event->getDamager();
+
+            if (!$damager instanceof \pocketmine\player\Player) {
+                return;
+            }
+            $target = SessionFactory::get($damager);
+            $target_player = $this->playerManager->get($target);
+
+            if ($target === null) {
+                return;
+            }
+
+            if ($target->getGame() === null || $target->getGame()->getWorld()->getFolderName() !== $this->getWorld()->getFolderName()) {
+                $event->cancel();
+                return;
+            }
+            $player->getCombat()->set($target_player);
+        }
+        $finalHealth = $entity->getHealth() - $event->getFinalDamage();
+
+        if ($finalHealth <= 0.000) {
+            $event->cancel();
+            $entity->setGamemode(GameMode::SPECTATOR());
+            $player->setSpectator(true);
+
+            if ($player->getCombat()->inCombat() && $player->getCombat()->getLastDamager() !== null) {
+                $lastDamager = $player->getCombat()->getLastDamager();
+                $this->playerManager->get($lastDamager->getInstance())->addElimination();
+
+                $this->broadcast(TextFormat::colorize('&e' . $entity->getName() . ' &7was killed by &e' . $lastDamager->getInstance()->getName()));
+            }
+            $this->checkWinner();
         }
     }
 
@@ -127,13 +238,14 @@ final class Game {
         }
         $this->playerManager->add($session);
         $session->setGame($this);
+        $session->getPlayer()->setImmobile();
 
         $slotIndex = 0;
         while (isset($this->slots[$slotIndex])) {
             $slotIndex++;
         }
         $this->slots[$slotIndex] = $session->getPlayer()->getXuid();
-        $session->getPlayer()->teleport(Position::fromObject($this->spawns[$slotIndex], $this->world));
+        $session->getPlayer()->teleport(Position::fromObject($this->spawns[$slotIndex]->add(0, 1, 0), $this->world));
 
         if ($this->state === self::WAITING && count($this->playerManager->getAll()) >= $this->minPlayers) {
             $this->state = self::STARTING;
@@ -162,9 +274,8 @@ final class Game {
 
         $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->getInstance()->isOnline() && $player->isPlaying());
         if ($this->state === self::STARTING && count($players) < $this->minPlayers) {
-            /** @var GameWaitingTask|null $gameWaiting */
-            $gameWaiting = $this->taskHandler?->getTask();
-            $gameWaiting?->setStartQueue(60);
+            $this->gameRunningTask?->setStartQueue(60);
+            $this->state = self::WAITING;
         }
         return true;
     }

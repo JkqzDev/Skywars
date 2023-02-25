@@ -6,8 +6,10 @@ namespace juqn\skywars\session\handler;
 
 use juqn\skywars\game\GameFactory;
 use juqn\skywars\session\Session;
+use juqn\skywars\task\world\WorldCopyAsync;
 use pocketmine\math\Vector3;
 use pocketmine\player\GameMode;
+use pocketmine\Server;
 use pocketmine\utils\TextFormat;
 use pocketmine\world\World;
 
@@ -72,6 +74,11 @@ final class CreatorHandler {
 
         $player->sendMessage(TextFormat::colorize('&aYou have been created the skywars game ' . $this->world->getFolderName()));
         $player->teleport($player->getServer()->getWorldManager()->getDefaultWorld()->getSpawnLocation());
+
+        Server::getInstance()->getAsyncPool()->submitTask(new WorldCopyAsync(
+            worldName: $this->world->getFolderName(),
+            copyToServerWorld: false
+        ));
     }
 
     public function prepare(): void {

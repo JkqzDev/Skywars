@@ -10,11 +10,12 @@ use pocketmine\scheduler\CancelTaskException;
 use pocketmine\scheduler\Task;
 use pocketmine\utils\TextFormat;
 
-final class GameWaitingTask extends Task {
+final class GameRunningTask extends Task {
 
     public function __construct(
         private Game $game,
-        private int $start_queue
+        private int $start_queue,
+        private int $stop_queue
     ) {}
 
     public function setStartQueue(int $start_queue): void {
@@ -25,13 +26,17 @@ final class GameWaitingTask extends Task {
         $players = array_filter($this->game->getPlayerManager()->getAll(), fn(Player $player) => !$player->isSpectator() && $player->isPlaying());
 
         if ($this->game->getState() === Game::STARTING) {
-            if ($this->start_queue <= 0) {
+            if (--$this->start_queue <= 0) {
                 $this->game->start();
-                throw new CancelTaskException();
+                return;
             }
             $this->game->broadcast(TextFormat::colorize('&eStarting game in ' . $this->start_queue . ' seconds'), 1);
-        } else {
+        } elseif ($this->game->getState() === Game::WAITING) {
             $this->game->broadcast(TextFormat::colorize('&eWaiting ' . ($this->game->getMinPlayers() - count($players)) . ' players...'), 1);
+        } elseif ($this->game->getState() === Game::ENDING) {
+            if (--$this->stop_queue <= 0) {
+                $this->game->stop();
+            }
         }
     }
 }

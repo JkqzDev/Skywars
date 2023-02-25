@@ -5,14 +5,43 @@ declare(strict_types=1);
 namespace juqn\skywars;
 
 use juqn\skywars\session\SessionFactory;
+use pocketmine\event\block\BlockBreakEvent;
+use pocketmine\event\block\BlockPlaceEvent;
+use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerChatEvent;
 use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\event\player\PlayerQuitEvent;
+use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
 use pocketmine\world\World;
 
 final class SkywarsHandler implements Listener {
+
+    public function handleBreak(BlockBreakEvent $event): void {
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+
+        $session?->getGame()?->handleBreak($event);
+    }
+
+    public function handlePlace(BlockPlaceEvent $event): void {
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+
+        $session?->getGame()?->handlePlace($event);
+    }
+
+    public function handleDamage(EntityDamageEvent $event): void {
+        $entity = $event->getEntity();
+
+        if (!$entity instanceof Player) {
+            return;
+        }
+        $session = SessionFactory::get($entity);
+
+        $session?->getGame()?->handleDamage($event);
+    }
 
     public function handleChat(PlayerChatEvent $event): void {
         $message = $event->getMessage();
