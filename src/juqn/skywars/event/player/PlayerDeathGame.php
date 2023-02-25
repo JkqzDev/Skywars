@@ -13,7 +13,7 @@ final class PlayerDeathGame extends GameEvent {
     public function __construct(
         Game $game,
         private Player $player,
-        private Player $damager
+        private ?Player $damager = null
     ) {
         parent::__construct($game);
     }
@@ -22,7 +22,7 @@ final class PlayerDeathGame extends GameEvent {
         return $this->player;
     }
 
-    public function getDamager(): Player {
+    public function getDamager(): ?Player {
         return $this->damager;
     }
 }

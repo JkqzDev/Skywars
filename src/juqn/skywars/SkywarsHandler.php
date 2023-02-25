@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace juqn\skywars;
 
+use juqn\skywars\event\player\PlayerDeathGame;
+use juqn\skywars\event\player\PlayerJoinGame;
+use juqn\skywars\event\player\PlayerQuitGame;
+use juqn\skywars\event\player\PlayerWinGame;
 use juqn\skywars\session\SessionFactory;
 use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\block\BlockPlaceEvent;
@@ -17,6 +21,30 @@ use pocketmine\utils\TextFormat;
 use pocketmine\world\World;
 
 final class SkywarsHandler implements Listener {
+
+    public function handleDeathGame(PlayerDeathGame $event): void {
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+        $session?->getGame()?->handleDeathGame($event);
+    }
+
+    public function handleJoinGame(PlayerJoinGame $event): void {
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+        $session?->getGame()?->handleJoinGame($event);
+    }
+
+    public function handleQuitGame(PlayerQuitGame $event): void {
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+        $session?->getGame()?->handleQuitGame($event);
+    }
+
+    public function handleWinGame(PlayerWinGame $event): void {
+        $player = $event->getWinner();
+        $session = SessionFactory::get($player);
+        $session?->getGame()?->handleWinGame($event);
+    }
 
     public function handleBreak(BlockBreakEvent $event): void {
         $player = $event->getPlayer();

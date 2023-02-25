@@ -51,5 +51,7 @@ final class Session {
 
         $player->getHungerManager()->setFood($player->getHungerManager()->getMaxFood());
         $player->setHealth($player->getMaxHealth());
+
+        $player->getXpManager()->setXpAndProgress(0, 0.0);
     }
 }

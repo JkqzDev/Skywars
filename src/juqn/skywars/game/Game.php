@@ -8,12 +8,14 @@ use InvalidArgumentException;
 use juqn\skywars\event\GameChangeStateEvent;
 use juqn\skywars\event\GameStartEvent;
 use juqn\skywars\event\GameStopEvent;
+use juqn\skywars\event\player\PlayerDeathGame;
 use juqn\skywars\event\player\PlayerJoinGame;
 use juqn\skywars\event\player\PlayerQuitGame;
 use juqn\skywars\event\player\PlayerWinGame;
 use juqn\skywars\game\player\Player;
 use juqn\skywars\game\player\PlayerManager;
 use juqn\skywars\game\task\GameRunningTask;
+use juqn\skywars\item\LeaveGame;
 use juqn\skywars\session\Session;
 use juqn\skywars\session\SessionFactory;
 use juqn\skywars\Skywars;
@@ -125,7 +127,8 @@ final class Game {
 
         foreach ($this->playerManager->getAll() as $player) {
             if ($player->getInstance()->isOnline()) {
-                $player->getInstance()->teleport(Server::getInstance()->getWorldManager()->getDefaultWorld()?->getSpawnLocation());
+                $event = new PlayerQuitGame($this, $player->getInstance());
+                $event->call();
             }
         }
         $this->playerManager->reset();
@@ -145,6 +148,9 @@ final class Game {
     }
 
     public function broadcast(string $message, int $type = 0): void {
+        if ($this->state === self::ENDING) {
+            return;
+        }
         $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->getInstance()->isOnline() && $player->isPlaying());
 
         foreach ($players as $player) {
@@ -170,6 +176,56 @@ final class Game {
 
             $this->setState(self::ENDING);
         }
+    }
+
+    public function handleDeathGame(PlayerDeathGame $event): void {
+        $player = $event->getPlayer();
+        $damager = $event->getDamager();
+        $game = $event->getGame();
+
+        $session = SessionFactory::get($player);
+        $session?->clear();
+
+        $player->setGamemode(GameMode::SPECTATOR());
+
+        if ($damager !== null) {
+            $game->broadcast(TextFormat::colorize('&e' . $player->getName() . ' &7was killed by &e' . $damager->getName()));
+        } else {
+            $game->broadcast(TextFormat::colorize('&e' . $player->getName() . ' &7died!'));
+        }
+    }
+
+    public function handleJoinGame(PlayerJoinGame $event): void {
+        $player = $event->getPlayer();
+        $game = $event->getGame();
+
+        $session = SessionFactory::get($player);
+        $session?->clear();
+
+        $player->getInventory()->setContents([
+            8 => new LeaveGame()
+        ]);
+
+        $game->broadcast(TextFormat::colorize('&7' . $player->getName() . ' &ehas join &7(&a' . count($game->getPlayerManager()->getAll()) . '&7/&a' . $game->getMaxPlayers() . '&7)'));
+    }
+
+    public function handleQuitGame(PlayerQuitGame $event): void {
+        $player = $event->getPlayer();
+        $game = $event->getGame();
+
+        $session = SessionFactory::get($player);
+        $session?->clear();
+
+        $player->teleport($player->getServer()->getWorldManager()->getDefaultWorld()->getSpawnLocation());
+
+        $game->broadcast(TextFormat::colorize('&7' . $player->getName() . ' &cquit!'));
+    }
+
+    public function handleWinGame(PlayerWinGame $event): void {
+        $game = $event->getGame();
+        $winner = $event->getWinner();
+
+        // Code
     }
 
     public function handleBreak(BlockBreakEvent $event): void {
@@ -230,15 +286,17 @@ final class Game {
 
         if ($finalHealth <= 0.000 || $event->getCause() === EntityDamageEvent::CAUSE_VOID) {
             $event->cancel();
-            $entity->setGamemode(GameMode::SPECTATOR());
             $player?->setSpectator(true);
 
             if ($player !== null && $player->getCombat()->inCombat() && $player->getCombat()->getLastDamager() !== null) {
                 $lastDamager = $player->getCombat()->getLastDamager();
                 $this->playerManager->get($lastDamager->getInstance())?->addElimination();
 
-                $this->broadcast(TextFormat::colorize('&e' . $entity->getName() . ' &7was killed by &e' . $lastDamager->getInstance()->getName()));
+                $event = new PlayerDeathGame($this, $entity, $player->getCombat()->getLastDamager()->getInstance());
+            } else {
+                $event = new PlayerDeathGame($this, $entity, null);
             }
+            $event->call();
             $this->checkWinner();
         }
     }
@@ -301,7 +359,7 @@ final class Game {
 
         $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying());
         if ($this->state === self::STARTING && count($players) < $this->minPlayers) {
-            $this->gameRunningTask?->setStartQueue(60);
+            $this->gameRunningTask->setStartQueue(60);
             $this->setState(self::WAITING);
         }
         return true;
