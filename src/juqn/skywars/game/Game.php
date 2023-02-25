@@ -26,6 +26,7 @@ use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\block\BlockPlaceEvent;
 use pocketmine\event\entity\EntityDamageByEntityEvent;
 use pocketmine\event\entity\EntityDamageEvent;
+use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\math\Vector3;
 use pocketmine\player\GameMode;
 use pocketmine\Server;
@@ -298,6 +299,22 @@ final class Game {
             }
             $event->call();
             $this->checkWinner();
+        }
+    }
+
+    public function handleInteract(PlayerInteractEvent $event): void {
+        $item = $event->getItem();
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+
+        if ($session === null) {
+            return;
+        }
+
+        if ($this->state <= self::STARTING) {
+            if ($item instanceof LeaveGame) {
+                $this->removePlayer($session);
+            }
         }
     }
 

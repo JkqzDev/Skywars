@@ -14,6 +14,7 @@ use pocketmine\event\block\BlockPlaceEvent;
 use pocketmine\event\entity\EntityDamageEvent;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerChatEvent;
+use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\player\Player;
@@ -176,6 +177,12 @@ final class SkywarsHandler implements Listener {
                 $player->sendMessage(TextFormat::colorize(Skywars::PREFIX . '&aSpawn #' . $slotIndex . ' added.'));
                 break;
         }
+    }
+
+    public function handleInteract(PlayerInteractEvent $event): void {
+        $player = $event->getPlayer();
+        $session = SessionFactory::get($player);
+        $session?->getGame()?->handleInteract($event);
     }
 
     public function handleJoin(PlayerJoinEvent $event): void {
