@@ -18,8 +18,16 @@ final class GameRunningTask extends Task {
         private int $stop_queue
     ) {}
 
+    public function getStartQueue(): int {
+        return $this->start_queue;
+    }
+
     public function setStartQueue(int $start_queue): void {
         $this->start_queue = $start_queue;
+    }
+
+    public function setStopQueue(int $stop_queue): void {
+        $this->stop_queue = $stop_queue;
     }
 
     public function onRun(): void {

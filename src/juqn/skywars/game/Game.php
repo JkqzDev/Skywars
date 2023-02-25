@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace juqn\skywars\game;
 
 use InvalidArgumentException;
+use juqn\skywars\event\GameChangeStateEvent;
+use juqn\skywars\event\GameStartEvent;
+use juqn\skywars\event\GameStopEvent;
 use juqn\skywars\event\player\PlayerJoinGame;
 use juqn\skywars\event\player\PlayerQuitGame;
 use juqn\skywars\event\player\PlayerWinGame;
@@ -36,6 +39,7 @@ final class Game {
     public const ENDING = 3;
 
     private PlayerManager $playerManager;
+    private GameRunningTask $gameRunningTask;
 
     /**
      * @param World $world
@@ -45,7 +49,6 @@ final class Game {
      * @param int $state
      * @param Vector3[] $spawns
      * @param string[] $slots
-     * @param GameRunningTask|null $gameRunningTask
      */
     public function __construct(
         private World $world,
@@ -54,8 +57,7 @@ final class Game {
         private int $maxPlayers,
         private int $state = self::WAITING,
         private array $spawns = [],
-        private array $slots = [],
-        private ?GameRunningTask $gameRunningTask = null
+        private array $slots = []
     ) {
         $this->playerManager = new PlayerManager($this);
         $this->gameRunningTask = new GameRunningTask($this, 60, 10);
@@ -77,7 +79,7 @@ final class Game {
         return $this->state;
     }
 
-    public function getGameRunningTask(): ?GameRunningTask {
+    public function getGameRunningTask(): GameRunningTask {
         return $this->gameRunningTask;
     }
 
@@ -87,10 +89,16 @@ final class Game {
 
     public function setState(int $state): void {
         $this->state = $state;
+
+        $event = new GameChangeStateEvent($this, $state);
+        $event->call();
     }
 
     public function start(): void {
-        $this->state = self::RUNNING;
+        $event = new GameStartEvent($this);
+        $event->call();
+
+        $this->setState(self::RUNNING);
 
         foreach ($this->playerManager->getAll() as $player) {
             if ($player->getInstance()->isOnline()) {
@@ -106,8 +114,14 @@ final class Game {
     }
 
     public function stop(): void {
-        $this->state = self::ENDING;
+        $event = new GameStopEvent($this);
+        $event->call();
+
+        $this->setState(self::ENDING);
         $this->slots = [];
+
+        $this->gameRunningTask->setStartQueue(60);
+        $this->gameRunningTask->setStopQueue(10);
 
         foreach ($this->playerManager->getAll() as $player) {
             if ($player->getInstance()->isOnline()) {
@@ -154,7 +168,7 @@ final class Game {
             $event = new PlayerWinGame($this, $winner->getInstance());
             $event->call();
 
-            $this->state = self::ENDING;
+            $this->setState(self::ENDING);
         }
     }
 
@@ -256,7 +270,9 @@ final class Game {
         $session->getPlayer()->teleport(Position::fromObject($this->spawns[$slotIndex]->add(0, 1, 0), $this->world));
 
         if ($this->state === self::WAITING && count($this->playerManager->getAll()) >= $this->minPlayers) {
-            $this->state = self::STARTING;
+            $this->setState(self::STARTING);
+        } elseif ($this->state === self::STARTING && count($this->playerManager->getAll()) >= $this->maxPlayers && $this->gameRunningTask->getStartQueue() > 10) {
+            $this->setState(self::RUNNING);
         }
         return true;
     }
@@ -283,10 +299,10 @@ final class Game {
             unset($this->slots[$slotIndex]);
         }
 
-        $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->getInstance()->isOnline() && $player->isPlaying());
+        $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying());
         if ($this->state === self::STARTING && count($players) < $this->minPlayers) {
             $this->gameRunningTask?->setStartQueue(60);
-            $this->state = self::WAITING;
+            $this->setState(self::WAITING);
         }
         return true;
     }
