@@ -13,11 +13,7 @@ final class WorldCopyAsync extends AsyncTask {
     private string $serverWorldDirectory;
     private string $pluginWorldDirectory;
 
-    public function __construct(
-        private string $worldName,
-        private bool $copyToServerWorld = true,
-        private ?\Closure $closure = null
-    ) {
+    public function __construct(private string $worldName, private bool $copyToServerWorld = true, private ?\Closure $closure = null) {
         $this->serverWorldDirectory = Server::getInstance()->getDataPath() . 'worlds' . DIRECTORY_SEPARATOR;
         $this->pluginWorldDirectory = Skywars::getInstance()->getDataFolder() . 'worlds' . DIRECTORY_SEPARATOR;
     }
@@ -27,15 +23,6 @@ final class WorldCopyAsync extends AsyncTask {
             $this->copySource($this->pluginWorldDirectory . $this->worldName, $this->serverWorldDirectory . $this->worldName);
         } else {
             $this->copySource($this->serverWorldDirectory . $this->worldName, $this->pluginWorldDirectory . $this->worldName);
-        }
-    }
-
-    public function onCompletion(): void {
-        $closure = $this->closure;
-
-        if ($closure !== null) {
-            Server::getInstance()->getWorldManager()->loadWorld($this->worldName);
-            $closure(Server::getInstance()->getWorldManager()->getWorldByName($this->worldName));
         }
     }
 
@@ -60,5 +47,14 @@ final class WorldCopyAsync extends AsyncTask {
             @copy($Entry, $target . DIRECTORY_SEPARATOR . $entry);
         }
         $dir->close();
+    }
+
+    public function onCompletion(): void {
+        $closure = $this->closure;
+
+        if ($closure !== null) {
+            Server::getInstance()->getWorldManager()->loadWorld($this->worldName);
+            $closure(Server::getInstance()->getWorldManager()->getWorldByName($this->worldName));
+        }
     }
 }

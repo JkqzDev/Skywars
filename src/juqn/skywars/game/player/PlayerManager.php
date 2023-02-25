@@ -12,20 +12,13 @@ final class PlayerManager {
     /** @var Player[] */
     private array $players = [];
 
-    public function __construct(
-        private Game $game
-    ) {}
+    public function __construct(private Game $game) {}
 
     /**
      * @return Player[]
      */
     public function getAll(): array {
         return $this->players;
-    }
-
-    public function get(Session|\pocketmine\player\Player $session): ?Player {
-        $xuid = $session instanceof Session ? $session->getPlayer()->getXuid() : $session->getXuid();
-        return $this->players[$xuid] ?? null;
     }
 
     public function add(Session $session): Player {
@@ -46,6 +39,11 @@ final class PlayerManager {
         }
         $player->setPlaying(false);
         $this->game->checkWinner();
+    }
+
+    public function get(Session|\pocketmine\player\Player $session): ?Player {
+        $xuid = $session instanceof Session ? $session->getPlayer()->getXuid() : $session->getXuid();
+        return $this->players[$xuid] ?? null;
     }
 
     public function reset(): void {

@@ -11,11 +11,7 @@ use pocketmine\world\World;
 
 final class Session {
 
-    public function __construct(
-        private Player $player,
-        private ?Game $game = null,
-        private ?CreatorHandler $creatorHandler = null
-    ) {}
+    public function __construct(private Player $player, private ?Game $game = null, private ?CreatorHandler $creatorHandler = null) {}
 
     public function getPlayer(): Player {
         return $this->player;

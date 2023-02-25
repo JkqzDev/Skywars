@@ -8,10 +8,7 @@ use juqn\skywars\game\player\Player;
 
 final class Combat {
 
-    public function __construct(
-        private ?int $time = null,
-        private ?Player $lastDamager = null
-    ) {}
+    public function __construct(private ?int $time = null, private ?Player $lastDamager = null) {}
 
     public function getLastDamager(): ?Player {
         return $this->lastDamager;

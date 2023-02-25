@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace juqn\skywars;
 
+use JsonException;
 use juqn\skywars\command\SkywarsCommand;
 use juqn\skywars\entity\SkywarsEntity;
+use juqn\skywars\game\GameFactory;
 use juqn\skywars\task\GameTask;
 use pocketmine\entity\EntityDataHelper;
 use pocketmine\entity\EntityFactory;
@@ -24,19 +26,36 @@ final class Skywars extends PluginBase {
     }
 
     protected function onEnable(): void {
-        /////////////////////////////////////////////////
-        if (!is_dir($this->getDataFolder() . 'worlds')) {
-            @mkdir($this->getDataFolder() . 'worlds');
-        }
-        /////////////////////////////////////////////////
+        $this->registerCommand();
+        $this->registerHandler();
+        $this->registerTaskHandler();
+        $this->registerEntity();
+
+        GameFactory::load();
+    }
+
+    private function registerCommand(): void {
         $this->getServer()->getCommandMap()->register('Skywars', new SkywarsCommand());
-        /////////////////////////////////////////////////
+    }
+
+    private function registerHandler(): void {
         $this->getServer()->getPluginManager()->registerEvents(new SkywarsHandler(), $this);
-        /////////////////////////////////////////////////
+    }
+
+    private function registerTaskHandler(): void {
         $this->getScheduler()->scheduleRepeatingTask(new GameTask(), 20);
-        ////////////////////////////////////////////////
-        EntityFactory::getInstance()->register(SkywarsEntity::class, function (CompoundTag $nbt, World $world): SkywarsEntity {
+    }
+
+    private function registerEntity(): void {
+        EntityFactory::getInstance()->register(SkywarsEntity::class, function (World $world, CompoundTag $nbt): SkywarsEntity {
             return new SkywarsEntity(EntityDataHelper::parseLocation($nbt, $world), SkywarsEntity::parseSkinNBT($nbt), $nbt);
         }, ['SkywarsEntity']);
+    }
+
+    /**
+     * @throws JsonException
+     */
+    protected function onDisable(): void {
+        GameFactory::save();
     }
 }

@@ -10,10 +10,7 @@ use pocketmine\player\Player;
 
 final class PlayerWinGame extends GameEvent {
 
-    public function __construct(
-        Game $game,
-        private Player $winner
-    ) {
+    public function __construct(Game $game, private Player $winner) {
         parent::__construct($game);
     }
 

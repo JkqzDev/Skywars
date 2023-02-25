@@ -6,17 +6,12 @@ namespace juqn\skywars\game\task;
 
 use juqn\skywars\game\Game;
 use juqn\skywars\game\player\Player;
-use pocketmine\scheduler\CancelTaskException;
 use pocketmine\scheduler\Task;
 use pocketmine\utils\TextFormat;
 
 final class GameRunningTask extends Task {
 
-    public function __construct(
-        private Game $game,
-        private int $start_queue,
-        private int $stop_queue
-    ) {}
+    public function __construct(private Game $game, private int $start_queue, private int $stop_queue) {}
 
     public function getStartQueue(): int {
         return $this->start_queue;

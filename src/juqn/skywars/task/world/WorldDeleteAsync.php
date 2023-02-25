@@ -11,23 +11,12 @@ final class WorldDeleteAsync extends AsyncTask {
 
     private string $serverWorldDirectory;
 
-    public function __construct(
-        private string $worldName,
-        private ?\Closure $closure = null
-    ) {
+    public function __construct(private string $worldName, private ?\Closure $closure = null) {
         $this->serverWorldDirectory = Server::getInstance()->getDataPath() . 'worlds' . DIRECTORY_SEPARATOR;
     }
 
     public function onRun(): void {
         $this->deleteSource($this->serverWorldDirectory . $this->worldName);
-    }
-
-    public function onCompletion(): void {
-        $closure = $this->closure;
-
-        if ($closure !== null) {
-            $closure();
-        }
     }
 
     private function deleteSource(string $source): void {
@@ -50,5 +39,13 @@ final class WorldDeleteAsync extends AsyncTask {
             }
         }
         rmdir($source);
+    }
+
+    public function onCompletion(): void {
+        $closure = $this->closure;
+
+        if ($closure !== null) {
+            $closure();
+        }
     }
 }

@@ -21,6 +21,7 @@ use juqn\skywars\session\SessionFactory;
 use juqn\skywars\Skywars;
 use juqn\skywars\task\world\WorldCopyAsync;
 use juqn\skywars\task\world\WorldDeleteAsync;
+use juqn\skywars\util\Math;
 use pocketmine\block\VanillaBlocks;
 use pocketmine\event\block\BlockBreakEvent;
 use pocketmine\event\block\BlockPlaceEvent;
@@ -33,6 +34,7 @@ use pocketmine\Server;
 use pocketmine\utils\TextFormat;
 use pocketmine\world\Position;
 use pocketmine\world\World;
+use RuntimeException;
 
 final class Game {
 
@@ -53,25 +55,28 @@ final class Game {
      * @param Vector3[] $spawns
      * @param string[] $slots
      */
-    public function __construct(
-        private World $world,
-        private int $heightLimiter,
-        private int $minPlayers,
-        private int $maxPlayers,
-        private int $state = self::WAITING,
-        private array $spawns = [],
-        private array $slots = []
-    ) {
+    public function __construct(private World $world, private int $heightLimiter, private int $minPlayers, private int $maxPlayers, private int $state = self::WAITING, private array $spawns = [], private array $slots = []) {
         $this->playerManager = new PlayerManager($this);
         $this->gameRunningTask = new GameRunningTask($this, 60, 10);
     }
 
-    public function getWorld(): World {
-        return $this->world;
-    }
+    /**
+     * @param string $worldName
+     * @param array $data
+     *
+     * @return static
+     */
+    public static function deserializeData(string $worldName, array $data): self {
+        if (!Server::getInstance()->getWorldManager()->isWorldGenerated($worldName)) {
+            throw new RuntimeException('World game ' . $worldName . ' not exists.');
+        }
 
-    public function getMaxPlayers(): int {
-        return $this->maxPlayers;
+        if (!Server::getInstance()->getWorldManager()->isWorldLoaded($worldName)) {
+            Server::getInstance()->getWorldManager()->loadWorld($worldName, true);
+        }
+        $world = Server::getInstance()->getWorldManager()->getWorldByName($worldName);
+
+        return new self(world: $world, heightLimiter: (int) $data['height-limiter'], minPlayers: (int) $data['min-players'], maxPlayers: (int) $data['max-players'], spawns: array_map(fn(string $data) => Math::stringToVector($data), $data['spawns']));
     }
 
     public function getMinPlayers(): int {
@@ -84,17 +89,6 @@ final class Game {
 
     public function getGameRunningTask(): GameRunningTask {
         return $this->gameRunningTask;
-    }
-
-    public function getPlayerManager(): PlayerManager {
-        return $this->playerManager;
-    }
-
-    public function setState(int $state): void {
-        $this->state = $state;
-
-        $event = new GameChangeStateEvent($this, $state);
-        $event->call();
     }
 
     public function start(): void {
@@ -116,6 +110,13 @@ final class Game {
         }
     }
 
+    public function setState(int $state): void {
+        $this->state = $state;
+
+        $event = new GameChangeStateEvent($this, $state);
+        $event->call();
+    }
+
     public function stop(): void {
         $event = new GameStopEvent($this);
         $event->call();
@@ -135,48 +136,11 @@ final class Game {
         $this->playerManager->reset();
         $worldName = $this->world->getFolderName();
 
-        Server::getInstance()->getAsyncPool()->submitTask(new WorldDeleteAsync(
-            worldName: $worldName,
-            closure: function () use ($worldName): void {
-                Server::getInstance()->getAsyncPool()->submitTask(new WorldCopyAsync(
-                    worldName: $worldName,
-                    closure: function (World $world): void {
+        Server::getInstance()->getAsyncPool()->submitTask(new WorldDeleteAsync(worldName: $worldName, closure: function () use ($worldName): void {
+                Server::getInstance()->getAsyncPool()->submitTask(new WorldCopyAsync(worldName: $worldName, closure: function (World $world): void {
                         Skywars::getInstance()->getLogger()->info('World from the game ' . $world->getFolderName() . ' is open.');
-                    }
-                ));
-            }
-        ));
-    }
-
-    public function broadcast(string $message, int $type = 0): void {
-        if ($this->state === self::ENDING) {
-            return;
-        }
-        $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->getInstance()->isOnline() && $player->isPlaying());
-
-        foreach ($players as $player) {
-            match ($type) {
-                0 => $player->getInstance()->sendMessage($message),
-                1 => $player->getInstance()->sendPopup($message),
-                2 => $player->getInstance()->sendTip($message),
-                3 => $player->getInstance()->sendActionBarMessage($message),
-                default => throw new InvalidArgumentException('Invalid broadcast type')
-            };
-        }
-    }
-
-    public function checkWinner(): void {
-        /** @var Player[] $players */
-        $players = array_values(array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying() && !$player->isSpectator()));
-
-        if (count($players) === 1) {
-            $winner = $players[0];
-
-            $event = new PlayerWinGame($this, $winner->getInstance());
-            $event->call();
-
-            $this->setState(self::ENDING);
-        }
+                    }));
+            }));
     }
 
     public function handleDeathGame(PlayerDeathGame $event): void {
@@ -196,6 +160,23 @@ final class Game {
         }
     }
 
+    public function broadcast(string $message, int $type = 0): void {
+        if ($this->state === self::ENDING) {
+            return;
+        }
+        $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->getInstance()->isOnline() && $player->isPlaying());
+
+        foreach ($players as $player) {
+            match ($type) {
+                0 => $player->getInstance()->sendMessage($message),
+                1 => $player->getInstance()->sendPopup($message),
+                2 => $player->getInstance()->sendTip($message),
+                3 => $player->getInstance()->sendActionBarMessage($message),
+                default => throw new InvalidArgumentException('Invalid broadcast type')
+            };
+        }
+    }
+
     public function handleJoinGame(PlayerJoinGame $event): void {
         $player = $event->getPlayer();
         $game = $event->getGame();
@@ -203,11 +184,17 @@ final class Game {
         $session = SessionFactory::get($player);
         $session?->clear();
 
-        $player->getInventory()->setContents([
-            8 => new LeaveGame()
-        ]);
+        $player->getInventory()->setContents([8 => new LeaveGame()]);
 
         $game->broadcast(TextFormat::colorize('&7' . $player->getName() . ' &ehas join &7(&a' . count($game->getPlayerManager()->getAll()) . '&7/&a' . $game->getMaxPlayers() . '&7)'));
+    }
+
+    public function getPlayerManager(): PlayerManager {
+        return $this->playerManager;
+    }
+
+    public function getMaxPlayers(): int {
+        return $this->maxPlayers;
     }
 
     public function handleQuitGame(PlayerQuitGame $event): void {
@@ -302,6 +289,24 @@ final class Game {
         }
     }
 
+    public function getWorld(): World {
+        return $this->world;
+    }
+
+    public function checkWinner(): void {
+        /** @var Player[] $players */
+        $players = array_values(array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying() && !$player->isSpectator()));
+
+        if (count($players) === 1) {
+            $winner = $players[0];
+
+            $event = new PlayerWinGame($this, $winner->getInstance());
+            $event->call();
+
+            $this->setState(self::ENDING);
+        }
+    }
+
     public function handleInteract(PlayerInteractEvent $event): void {
         $item = $event->getItem();
         $player = $event->getPlayer();
@@ -316,6 +321,36 @@ final class Game {
                 $this->removePlayer($session);
             }
         }
+    }
+
+    public function removePlayer(Session $session): bool {
+        $game = $session->getGame();
+
+        if ($game === null || $game->getWorld()->getFolderName() !== $this->getWorld()->getFolderName()) {
+            return false;
+        }
+
+        if ($this->playerManager->get($session) === null) {
+            $session->setGame(null);
+            return false;
+        }
+        $this->playerManager->remove($session);
+        $session->setGame(null);
+
+        $event = new PlayerQuitGame($this, $session->getPlayer());
+        $event->call();
+
+        $slotIndex = array_search($session->getPlayer()->getXuid(), $this->slots);
+        if ($slotIndex !== false) {
+            unset($this->slots[$slotIndex]);
+        }
+
+        $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying());
+        if ($this->state === self::STARTING && count($players) < $this->minPlayers) {
+            $this->gameRunningTask->setStartQueue(60);
+            $this->setState(self::WAITING);
+        }
+        return true;
     }
 
     public function addPlayer(Session $session): bool {
@@ -352,33 +387,7 @@ final class Game {
         return true;
     }
 
-    public function removePlayer(Session $session): bool {
-        $game = $session->getGame();
-
-        if ($game === null || $game->getWorld()->getFolderName() !== $this->getWorld()->getFolderName()) {
-            return false;
-        }
-
-        if ($this->playerManager->get($session) === null) {
-            $session->setGame(null);
-            return false;
-        }
-        $this->playerManager->remove($session);
-        $session->setGame(null);
-
-        $event = new PlayerQuitGame($this, $session->getPlayer());
-        $event->call();
-
-        $slotIndex = array_search($session->getPlayer()->getXuid(), $this->slots);
-        if ($slotIndex !== false) {
-            unset($this->slots[$slotIndex]);
-        }
-
-        $players = array_filter($this->playerManager->getAll(), fn(Player $player) => $player->isPlaying());
-        if ($this->state === self::STARTING && count($players) < $this->minPlayers) {
-            $this->gameRunningTask->setStartQueue(60);
-            $this->setState(self::WAITING);
-        }
-        return true;
+    public function serializeData(): array {
+        return ['height-limiter' => $this->heightLimiter, 'min-players' => $this->minPlayers, 'max-players' => $this->maxPlayers, 'spawns' => array_map(fn(Vector3 $vector3) => Math::vectorToString($vector3), $this->spawns)];
     }
 }

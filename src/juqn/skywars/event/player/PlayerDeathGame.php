@@ -10,11 +10,7 @@ use pocketmine\player\Player;
 
 final class PlayerDeathGame extends GameEvent {
 
-    public function __construct(
-        Game $game,
-        private Player $player,
-        private ?Player $damager = null
-    ) {
+    public function __construct(Game $game, private Player $player, private ?Player $damager = null) {
         parent::__construct($game);
     }
 

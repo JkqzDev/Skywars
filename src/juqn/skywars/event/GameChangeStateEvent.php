@@ -8,10 +8,7 @@ use juqn\skywars\game\Game;
 
 final class GameChangeStateEvent extends GameEvent {
 
-    public function __construct(
-        Game $game,
-        private int $state
-    ) {
+    public function __construct(Game $game, private int $state) {
         parent::__construct($game);
     }
 

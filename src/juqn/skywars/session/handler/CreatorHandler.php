@@ -15,15 +15,17 @@ use pocketmine\world\World;
 
 final class CreatorHandler {
 
-    public function __construct(
-        private Session $session,
-        private World $world,
-        private int $heightLimiter = World::Y_MAX,
-        private int $minPlayers = 2,
-        private int $maxPlayers = 12,
-        private array $spawns = []
-    ) {
+    public function __construct(private Session $session, private World $world, private int $heightLimiter = World::Y_MAX, private int $minPlayers = 2, private int $maxPlayers = 12, private array $spawns = []) {
         $this->prepare();
+    }
+
+    public function prepare(): void {
+        $player = $this->session->getPlayer();
+        $player->setGamemode(GameMode::CREATIVE());
+        $player->setFlying(true);
+        $player->setAllowFlight(true);
+
+        $player->teleport($this->world->getSpawnLocation());
     }
 
     public function getWorld(): World {
@@ -75,19 +77,7 @@ final class CreatorHandler {
         $player->sendMessage(TextFormat::colorize('&aYou have been created the skywars game ' . $this->world->getFolderName()));
         $player->teleport($player->getServer()->getWorldManager()->getDefaultWorld()->getSpawnLocation());
 
-        Server::getInstance()->getAsyncPool()->submitTask(new WorldCopyAsync(
-            worldName: $this->world->getFolderName(),
-            copyToServerWorld: false
-        ));
-    }
-
-    public function prepare(): void {
-        $player = $this->session->getPlayer();
-        $player->setGamemode(GameMode::CREATIVE());
-        $player->setFlying(true);
-        $player->setAllowFlight(true);
-
-        $player->teleport($this->world->getSpawnLocation());
+        Server::getInstance()->getAsyncPool()->submitTask(new WorldCopyAsync(worldName: $this->world->getFolderName(), copyToServerWorld: false));
     }
 
     public function reset(): void {
